@@ -1,0 +1,191 @@
+"""
+responsive.css.py
+
+A module for generating and managing mobile-responsive CSS styles.
+Handles breakpoint management and responsive style generation for the application.
+
+Author: [Your Name]
+Date: [Current Date]
+"""
+
+from typing import Dict, List, Optional, Union
+from dataclasses import dataclass
+import json
+import logging
+from pathlib import Path
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Type aliases
+CSSProperties = Dict[str, str]
+Breakpoint = int
+StyleRules = Dict[str, CSSProperties]
+
+@dataclass
+class BreakpointConfig:
+    """Configuration for responsive breakpoints"""
+    mobile: Breakpoint = 480
+    tablet: Breakpoint = 768
+    desktop: Breakpoint = 1024
+    large_desktop: Breakpoint = 1200
+
+class ResponsiveStyleManager:
+    """
+    Manages responsive styles and breakpoints for the application.
+    Generates mobile-first CSS with appropriate media queries.
+    """
+
+    def __init__(self, config: Optional[BreakpointConfig] = None):
+        """
+        Initialize the responsive style manager.
+
+        Args:
+            config: Optional custom breakpoint configuration
+        """
+        self.config = config or BreakpointConfig()
+        self.styles: StyleRules = {}
+        self.media_queries: Dict[str, StyleRules] = {}
+
+    def add_base_style(self, selector: str, properties: CSSProperties) -> None:
+        """
+        Add base styles that apply to all screen sizes.
+
+        Args:
+            selector: CSS selector
+            properties: Dictionary of CSS properties and values
+        """
+        try:
+            self.styles[selector] = properties
+        except Exception as e:
+            logger.error(f"Error adding base style for {selector}: {str(e)}")
+            raise
+
+    def add_responsive_style(
+        self, 
+        selector: str, 
+        properties: CSSProperties, 
+        min_width: Breakpoint
+    ) -> None:
+        """
+        Add styles for specific breakpoint.
+
+        Args:
+            selector: CSS selector
+            properties: Dictionary of CSS properties and values
+            min_width: Minimum width breakpoint
+        """
+        try:
+            breakpoint_key = f"@media (min-width: {min_width}px)"
+            if breakpoint_key not in self.media_queries:
+                self.media_queries[breakpoint_key] = {}
+            self.media_queries[breakpoint_key][selector] = properties
+        except Exception as e:
+            logger.error(f"Error adding responsive style for {selector}: {str(e)}")
+            raise
+
+    def generate_css(self) -> str:
+        """
+        Generate complete CSS string including all responsive styles.
+
+        Returns:
+            str: Generated CSS content
+        """
+        try:
+            css_parts: List[str] = []
+
+            # Add base styles
+            for selector, properties in self.styles.items():
+                css_parts.append(self._format_rule(selector, properties))
+
+            # Add media queries
+            for query, rules in self.media_queries.items():
+                query_parts = [query + " {"]
+                for selector, properties in rules.items():
+                    query_parts.append(self._format_rule(selector, properties, indent=2))
+                query_parts.append("}")
+                css_parts.append("\n".join(query_parts))
+
+            return "\n\n".join(css_parts)
+        except Exception as e:
+            logger.error(f"Error generating CSS: {str(e)}")
+            raise
+
+    def save_css(self, filepath: Union[str, Path]) -> None:
+        """
+        Save generated CSS to file.
+
+        Args:
+            filepath: Path to save the CSS file
+        """
+        try:
+            css_content = self.generate_css()
+            filepath = Path(filepath)
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(filepath, 'w') as f:
+                f.write(css_content)
+            
+            logger.info(f"CSS file successfully saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Error saving CSS file: {str(e)}")
+            raise
+
+    @staticmethod
+    def _format_rule(selector: str, properties: CSSProperties, indent: int = 0) -> str:
+        """
+        Format a CSS rule with proper indentation.
+
+        Args:
+            selector: CSS selector
+            properties: Dictionary of CSS properties and values
+            indent: Number of spaces to indent
+
+        Returns:
+            str: Formatted CSS rule
+        """
+        indent_str = " " * indent
+        properties_str = "\n".join(
+            f"{indent_str}  {key}: {value};"
+            for key, value in properties.items()
+        )
+        return f"{indent_str}{selector} {{\n{properties_str}\n{indent_str}}}"
+
+def create_default_responsive_styles() -> ResponsiveStyleManager:
+    """
+    Create a ResponsiveStyleManager with default mobile-first styles.
+
+    Returns:
+        ResponsiveStyleManager: Configured style manager
+    """
+    manager = ResponsiveStyleManager()
+
+    # Add default mobile styles
+    manager.add_base_style("body", {
+        "font-size": "16px",
+        "line-height": "1.5",
+        "padding": "1rem"
+    })
+
+    # Add tablet styles
+    manager.add_responsive_style("body", {
+        "font-size": "18px",
+        "padding": "2rem"
+    }, manager.config.tablet)
+
+    # Add desktop styles
+    manager.add_responsive_style("body", {
+        "font-size": "20px",
+        "padding": "3rem"
+    }, manager.config.desktop)
+
+    return manager
+
+if __name__ == "__main__":
+    # Example usage
+    try:
+        manager = create_default_responsive_styles()
+        manager.save_css("src/styles/responsive.css")
+    except Exception as e:
+        logger.error(f"Failed to generate responsive styles: {str(e)}")
