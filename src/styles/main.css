@@ -1,0 +1,182 @@
+"""
+CSS Vendor Prefix Manager and Cross-Browser Compatibility Helper
+Handles generation and management of cross-browser compatible CSS styles.
+"""
+
+from typing import Dict, List, Optional
+import re
+from dataclasses import dataclass
+
+@dataclass
+class VendorPrefix:
+    """Represents vendor prefixes for different browsers."""
+    webkit: str = '-webkit-'
+    moz: str = '-moz-'
+    ms: str = '-ms-'
+    o: str = '-o-'
+
+class CSSCompatibilityManager:
+    """
+    Manages CSS compatibility across different browsers by adding
+    appropriate vendor prefixes and fallback styles.
+    """
+
+    def __init__(self):
+        self.vendor_prefixes = VendorPrefix()
+        self.properties_requiring_prefixes = {
+            'transform',
+            'animation',
+            'transition',
+            'flex',
+            'user-select',
+            'appearance',
+            'backdrop-filter',
+            'box-shadow',
+            'gradient',
+        }
+
+    def add_vendor_prefixes(self, css_rule: str) -> str:
+        """
+        Adds vendor prefixes to CSS properties that require them.
+
+        Args:
+            css_rule (str): Original CSS rule
+
+        Returns:
+            str: CSS rule with vendor prefixes added
+        """
+        try:
+            # Split property and value
+            property_match = re.match(r'([\w-]+)\s*:\s*(.+);?', css_rule.strip())
+            if not property_match:
+                return css_rule
+
+            property_name, value = property_match.groups()
+            
+            if property_name not in self.properties_requiring_prefixes:
+                return css_rule
+
+            prefixed_rules = []
+            # Add vendor prefixed versions
+            for prefix in [
+                self.vendor_prefixes.webkit,
+                self.vendor_prefixes.moz,
+                self.vendor_prefixes.ms,
+                self.vendor_prefixes.o
+            ]:
+                prefixed_rules.append(f"{prefix}{property_name}: {value};")
+            
+            # Add standard version last
+            prefixed_rules.append(f"{property_name}: {value};")
+            
+            return '\n'.join(prefixed_rules)
+            
+        except Exception as e:
+            print(f"Error adding vendor prefixes: {str(e)}")
+            return css_rule
+
+    def add_fallback_styles(self, css_property: str, modern_value: str) -> List[str]:
+        """
+        Generates fallback styles for modern CSS properties.
+
+        Args:
+            css_property (str): CSS property name
+            modern_value (str): Modern CSS value
+
+        Returns:
+            List[str]: List of fallback styles including the modern version
+        """
+        fallbacks = []
+        
+        # Define fallback mappings
+        fallback_map = {
+            'display: flex': ['display: -webkit-box', 'display: -ms-flexbox'],
+            'display: grid': ['display: -ms-grid'],
+            'gap': ['grid-gap'],
+            'background-clip: text': ['-webkit-background-clip: text'],
+        }
+
+        # Get property-value combination
+        prop_value = f"{css_property}: {modern_value}"
+        
+        # Add fallbacks if they exist
+        if prop_value in fallback_map:
+            fallbacks.extend(fallback_map[prop_value])
+        
+        # Add the modern version last
+        fallbacks.append(prop_value)
+        
+        return fallbacks
+
+    def process_css_file(self, input_file: str, output_file: str) -> None:
+        """
+        Processes a CSS file and adds necessary vendor prefixes and fallbacks.
+
+        Args:
+            input_file (str): Path to input CSS file
+            output_file (str): Path to output CSS file
+        """
+        try:
+            with open(input_file, 'r') as f:
+                css_content = f.read()
+
+            # Process the CSS content
+            processed_content = self._process_css_content(css_content)
+
+            # Write the processed content
+            with open(output_file, 'w') as f:
+                f.write(processed_content)
+
+        except FileNotFoundError:
+            print(f"Error: Could not find file {input_file}")
+        except Exception as e:
+            print(f"Error processing CSS file: {str(e)}")
+
+    def _process_css_content(self, css_content: str) -> str:
+        """
+        Internal method to process CSS content and add compatibility fixes.
+
+        Args:
+            css_content (str): Original CSS content
+
+        Returns:
+            str: Processed CSS content with compatibility fixes
+        """
+        # Basic CSS rule pattern
+        rule_pattern = r'([^{]+){([^}]+)}'
+        
+        def process_rules(match):
+            selector = match.group(1).strip()
+            properties = match.group(2).strip()
+            
+            # Process each property
+            processed_properties = []
+            for prop in properties.split(';'):
+                if prop.strip():
+                    processed_properties.append(self.add_vendor_prefixes(prop.strip()))
+            
+            return f"{selector} {{\n    {'\n    '.join(processed_properties)}\n}}"
+
+        # Process all CSS rules
+        processed_content = re.sub(rule_pattern, process_rules, css_content)
+        return processed_content
+
+def main():
+    """Example usage of the CSS Compatibility Manager."""
+    manager = CSSCompatibilityManager()
+    
+    # Example processing a CSS rule
+    css_rule = "transform: scale(1.2);"
+    prefixed_rule = manager.add_vendor_prefixes(css_rule)
+    print("Example of vendor prefixes:")
+    print(prefixed_rule)
+    
+    # Example processing a file
+    try:
+        manager.process_css_file('src/styles/main.css', 'src/styles/main.compatible.css')
+        print("\nCSS file processed successfully!")
+    except Exception as e:
+        print(f"\nError processing CSS file: {str(e)}")
+
+if __name__ == "__main__":
+    main()
